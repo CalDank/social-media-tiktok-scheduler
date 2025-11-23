@@ -1,0 +1,333 @@
+import React, { useEffect, useState } from "react";
+import "./index.css";
+import Calendar from "./components/Calendar";
+import Sidebar from "./components/Sidebar";
+import PostModal from "./components/PostModal";
+
+/*
+  MULTI-PLATFORM READY DESIGN
+  ---------------------------
+  Platform structure:
+  {
+    id: "tiktok",
+    name: "TikTok",
+    icon: "fa-brands fa-tiktok",
+    color: "#00C9FF",
+    enabled: true
+  }
+
+  You can add Instagram, YouTube, etc., later:
+  {
+    id: "instagram",
+    name: "Instagram",
+    icon: "fa-brands fa-instagram",
+    color: "#E1306C",
+    enabled: false
+  }
+*/
+
+const SUPPORTED_PLATFORMS = [
+  {
+    id: "tiktok",
+    name: "TikTok",
+    icon: "fa-brands fa-tiktok",
+    color: "#00C9FF",
+    enabled: true,
+  },
+  {
+    id: "instagram",
+    name: "Instagram",
+    icon: "fa-brands fa-instagram",
+    color: "#E1306C",
+    enabled: false, // future release
+  },
+  {
+    id: "youtube",
+    name: "YouTube Shorts",
+    icon: "fa-brands fa-youtube",
+    color: "#FF0000",
+    enabled: false, // future release
+  },
+];
+
+/* Helper utilities */
+function sameDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function matchesFilter(status, filter) {
+  if (filter === "all") return true;
+  return status === filter;
+}
+
+/* Sample TikTok-only data */
+const initialPosts = [
+  {
+    id: 1,
+    platform: "tiktok",
+    title: "Welcome Teaser",
+    caption: "Launching our new Videotto TikTok scheduler!",
+    dateTime: new Date(new Date().setHours(18, 0, 0, 0)),
+    status: "scheduled",
+  },
+];
+
+function App() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [posts, setPosts] = useState(initialPosts);
+  const [filter, setFilter] = useState("all");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [defaultDate, setDefaultDate] = useState(new Date());
+
+  /* THEME HANDLING */
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("videotto-theme");
+    if (savedTheme) {
+      document.body.className = savedTheme;
+    } else {
+      document.body.classList.add("theme-dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const body = document.body;
+    if (body.classList.contains("theme-dark")) {
+      body.classList.replace("theme-dark", "theme-light");
+    } else {
+      body.classList.replace("theme-light", "theme-dark");
+    }
+    localStorage.setItem("videotto-theme", body.className);
+  };
+
+  /* MONTH NAVIGATION */
+  const shiftMonth = (offset) => {
+    const next = new Date(currentDate);
+    next.setMonth(next.getMonth() + offset);
+    setCurrentDate(next);
+  };
+
+  const goToToday = () => setCurrentDate(new Date());
+
+  /* MODALS */
+  const openNewPostModal = (date) => {
+    setEditingPost(null);
+    setDefaultDate(date || new Date());
+    setModalOpen(true);
+  };
+
+  const openEditPostModal = (post) => {
+    setEditingPost(post);
+    setDefaultDate(post.dateTime);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+  };
+
+  /* SAVE POST (TikTok for now) */
+  const handleSavePost = async (payload) => {
+    const { id, title, caption, date, time, postNow, videoFile, videoUrl, account } = payload;
+
+    try {
+      let mediaUrl = videoUrl || null;
+
+      // If there's a video file, upload it to the backend first
+      if (videoFile) {
+        const { uploadAPI } = await import('./services/api.js');
+        try {
+          const uploadResult = await uploadAPI.uploadVideo(videoFile, account || 'primary', title);
+          mediaUrl = uploadResult.filePath; // Store the file path for later posting
+        } catch (error) {
+          alert(`Failed to upload video: ${error.message}`);
+          return;
+        }
+      }
+
+      const dateTime = postNow ? new Date() : new Date(`${date}T${time}`);
+      const status = postNow ? "posted" : "scheduled";
+
+      if (id) {
+        // edit - in production, this would call the API
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? { ...p, title, caption, dateTime, status, media_url: mediaUrl, account: account || 'primary' }
+              : p
+          )
+        );
+      } else {
+        // new post - in production, this would call the API
+        const newPost = {
+          id: Date.now(),
+          platform: "tiktok",
+          title,
+          caption,
+          dateTime,
+          status,
+          media_url: mediaUrl,
+          account: account || 'primary',
+        };
+        setPosts((prev) => [...prev, newPost]);
+      }
+      setModalOpen(false);
+    } catch (error) {
+      console.error('Error saving post:', error);
+      alert(`Failed to save post: ${error.message}`);
+    }
+  };
+
+  /* Visible posts */
+  const filteredPosts = posts
+    .slice()
+    .sort((a, b) => a.dateTime - b.dateTime)
+    .filter((p) => matchesFilter(p.status, filter));
+
+  return (
+    <div className="app">
+      {/* HEADER */}
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">
+            <i className="fa-solid fa-bolt"></i>
+          </span>
+          <div>
+            <div className="brand-title">Videotto Scheduler</div>
+            <div className="brand-subtitle">
+              Multi-platform scheduler • TikTok enabled
+            </div>
+          </div>
+        </div>
+
+        <div className="topbar-actions">
+          {/* Platform toggle UI (future) */}
+          {SUPPORTED_PLATFORMS.map((p) => (
+            <button
+              key={p.id}
+              className="icon-button"
+              style={{
+                opacity: p.enabled ? 1 : 0.3,
+                color: p.enabled ? p.color : "var(--text-soft)",
+              }}
+              title={
+                p.enabled
+                  ? `${p.name} connected`
+                  : `${p.name} coming soon`
+              }
+              onClick={async () => {
+                if (p.id === 'tiktok' && p.enabled) {
+                  // Check TikTok connection status
+                  try {
+                    const { authAPI } = await import('./services/api.js');
+                    const status = await authAPI.getTikTokStatus('primary');
+                    if (!status.connected) {
+                      // Start OAuth flow
+                      const { authUrl } = await authAPI.getTikTokAuthUrl('primary');
+                      window.location.href = authUrl;
+                    } else {
+                      alert('TikTok account is already connected!');
+                    }
+                  } catch (error) {
+                    console.error('TikTok connection error:', error);
+                    alert('Failed to check TikTok connection status');
+                  }
+                }
+              }}
+            >
+              <i className={p.icon}></i>
+            </button>
+          ))}
+
+          {/* Create new post */}
+          <button
+            className="btn btn-primary"
+            onClick={() => openNewPostModal(new Date())}
+          >
+            <i className="fa-solid fa-plus"></i>
+            New TikTok Post
+          </button>
+
+          <button
+            className="icon-button"
+            onClick={toggleTheme}
+            title="Toggle Theme"
+          >
+            <i className="fa-solid fa-moon"></i>
+          </button>
+        </div>
+      </header>
+
+      {/* MAIN CONTENT */}
+      <main className="layout">
+        <section className="panel calendar-panel">
+          <div className="calendar-toolbar">
+            <div className="month-switcher">
+              <button
+                className="icon-button"
+                onClick={() => shiftMonth(-1)}
+              >
+                <i className="fa-solid fa-chevron-left"></i>
+              </button>
+              <div className="month-label">
+                {currentDate.toLocaleDateString(undefined, {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => shiftMonth(1)}
+              >
+                <i className="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+
+            <div className="calendar-toolbar-right">
+              <button className="btn btn-ghost" onClick={goToToday}>
+                Today
+              </button>
+              <span className="calendar-view-label">Month view</span>
+            </div>
+          </div>
+
+          {/* Calendar */}
+          <Calendar
+            currentDate={currentDate}
+            posts={posts}
+            filter={filter}
+            sameDay={sameDay}
+            matchesFilter={matchesFilter}
+            onDayClick={openNewPostModal}
+          />
+        </section>
+
+        {/* Sidebar */}
+        <aside className="panel side-panel">
+          <Sidebar
+            filteredPosts={filteredPosts}
+            filter={filter}
+            setFilter={setFilter}
+            onEditPost={openEditPostModal}
+          />
+        </aside>
+      </main>
+
+      {/* MODAL */}
+      <PostModal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        onSave={handleSavePost}
+        editingPost={editingPost}
+        defaultDate={defaultDate}
+      />
+    </div>
+  );
+}
+
+export default App;
