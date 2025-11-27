@@ -5,8 +5,6 @@ import Sidebar from "./components/Sidebar";
 import PostModal from "./components/PostModal";
 import TikTokConnection from "./components/TikTokConnection";
 
-<h1 style={{ color: "red" }}>THIS IS THE NEW VERSION</h1>
-
 /*
   MULTI-PLATFORM READY DESIGN
   ---------------------------
@@ -311,8 +309,32 @@ function App() {
 
   return (
     <div className="app">
+      {/* DEPLOYMENT TEST BANNER - REMOVE AFTER VERIFYING */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 99999,
+        background: 'linear-gradient(90deg, #ff006e, #8338ec, #3a86ff)',
+        color: 'white',
+        padding: '15px 20px',
+        textAlign: 'center',
+        fontSize: '20px',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        animation: 'pulse 2s infinite',
+        borderBottom: '3px solid #00ff00'
+      }}>
+        🚀🚀🚀 NEW DEPLOYMENT DETECTED - Code Updated Successfully! 🚀🚀🚀
+        <br />
+        <span style={{ fontSize: '14px', opacity: 0.9 }}>
+          Deployed: {new Date().toLocaleString()}
+        </span>
+      </div>
+
       {/* HEADER */}
-      <header className="topbar">
+      <header className="topbar" style={{ marginTop: '50px' }}>
         <div className="brand">
           <span className="brand-mark">
             <i className="fa-solid fa-bolt"></i>
