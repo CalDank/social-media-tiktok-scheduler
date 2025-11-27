@@ -152,6 +152,34 @@ export const uploadAPI = {
     return response.json();
   },
 
+  uploadAndPublish: async (file, account = 'primary', title = 'Untitled', caption = '') => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('account', account);
+    formData.append('title', title);
+    formData.append('caption', caption);
+
+    const response = await fetch(`${API_BASE_URL}/upload/video/publish`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload and publish failed' }));
+      throw new Error(error.error || 'Upload and publish failed');
+    }
+
+    return response.json();
+  },
+
   deleteVideo: (filename) => {
     return apiRequest(`/upload/video/${filename}`, {
       method: 'DELETE',

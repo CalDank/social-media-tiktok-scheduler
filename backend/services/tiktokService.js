@@ -208,6 +208,56 @@ export async function uploadVideoToTikTok(videoPathOrS3Key, accessToken, postInf
 }
 
 /**
+ * Publish video to TikTok using publish_id
+ */
+export async function publishVideoToTikTok(publishId, accessToken, caption = '', title = 'Untitled') {
+  try {
+    // Wait for video processing (TikTok needs time after upload)
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Publish the video
+    const publishResponse = await axios.post(
+      `${TIKTOK_API_BASE}/post/publish/`,
+      {
+        post_info: {
+          title: title,
+          description: caption || '',
+          privacy_level: 'PUBLIC_TO_EVERYONE',
+          disable_duet: false,
+          disable_comment: false,
+          disable_stitch: false,
+          video_cover_timestamp_ms: 1000,
+        },
+        source_info: {
+          source: 'FILE_UPLOAD',
+          video_id: publishId, // TikTok uses publish_id as video_id for publish
+        },
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (publishResponse.data.data && publishResponse.data.data.publish_id) {
+      console.log(`Video published successfully to TikTok. Publish ID: ${publishResponse.data.data.publish_id}`);
+      return {
+        success: true,
+        publishId: publishResponse.data.data.publish_id,
+        data: publishResponse.data.data
+      };
+    }
+
+    throw new Error('Publish response missing publish_id');
+  } catch (error) {
+    console.error('TikTok publish error:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
  * Post to TikTok using TikTok API
  */
 export async function postToTikTok(post) {

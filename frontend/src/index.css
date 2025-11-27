@@ -51,7 +51,6 @@ body {
     radial-gradient(circle at 80% 70%, rgba(255, 103, 224, 0.12) 0, transparent 50%),
     radial-gradient(circle at top left, #101320 0, var(--bg) 48%);
   color: var(--text);
-  overflow-x: hidden;
 }
 
 /* --------- APP FRAME --------- */

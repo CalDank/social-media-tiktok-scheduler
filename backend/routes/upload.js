@@ -84,7 +84,35 @@ router.post('/video', authenticateToken, upload.single('video'), async (req, res
       }
     }
 
-    // Upload to TikTok and get video_id
+    // DEMO MODE: Simulate upload without TikTok API
+    const isDemoMode = process.env.DEMO_MODE === 'true' || !process.env.TIKTOK_CLIENT_KEY;
+    
+    if (isDemoMode) {
+      // Simulate upload delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      console.log('🎬 DEMO MODE: Simulating video upload');
+      console.log(`  - Title: ${title}`);
+      console.log(`  - File: ${req.file.filename} (${(req.file.size / 1024 / 1024).toFixed(2)} MB)`);
+      console.log(`  - Account: ${account}`);
+      
+      const mockPublishId = `demo_publish_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      
+      res.json({
+        success: true,
+        demo: true,
+        videoId: mockPublishId,
+        filePath: storageLocation,
+        s3Key: s3Key,
+        filename: req.file.filename,
+        size: req.file.size,
+        storageType: isUsingS3() ? 's3' : 'local',
+        message: 'Video uploaded successfully. Ready to publish. (Demo Mode)'
+      });
+      return;
+    }
+    
+    // REAL MODE: Upload to TikTok and get video_id
     try {
       // For TikTok upload, we need the actual file
       // If using S3, we'll need to download it temporarily or stream it
@@ -137,6 +165,102 @@ router.post('/video', authenticateToken, upload.single('video'), async (req, res
     console.error('Video upload error:', error);
     res.status(500).json({ 
       error: error.message || 'Failed to upload video',
+      details: error.response?.data || null
+    });
+  }
+});
+
+// Upload and publish video immediately
+router.post('/video/publish', authenticateToken, upload.single('video'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No video file provided' });
+    }
+
+    const account = req.body.account || 'primary';
+    const title = req.body.title || 'Untitled';
+    const caption = req.body.caption || '';
+
+    // DEMO MODE: Simulate upload and publish
+    const isDemoMode = process.env.DEMO_MODE === 'true' || !process.env.TIKTOK_CLIENT_KEY;
+    
+    if (isDemoMode) {
+      // Simulate upload delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      console.log('🎬 DEMO MODE: Simulating video upload and publish');
+      console.log(`  - Title: ${title}`);
+      console.log(`  - Caption: ${caption}`);
+      console.log(`  - File: ${req.file.filename} (${(req.file.size / 1024 / 1024).toFixed(2)} MB)`);
+      console.log(`  - Account: ${account}`);
+      
+      // Generate mock publish ID
+      const mockPublishId = `demo_publish_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const mockVideoId = `demo_video_${Date.now()}`;
+      
+      // Clean up local file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      return res.json({
+        success: true,
+        demo: true,
+        message: 'Video published successfully to TikTok! (Demo Mode)',
+        publishId: mockPublishId,
+        videoId: mockVideoId,
+        data: {
+          publish_id: mockPublishId,
+          status: 'PUBLISHED'
+        }
+      });
+    }
+
+    // REAL MODE: Get valid access token
+    let accessToken;
+    try {
+      accessToken = await getValidAccessToken(req.user.userId, account);
+    } catch (error) {
+      fs.unlinkSync(req.file.path);
+      return res.status(401).json({ 
+        error: 'TikTok account not connected. Please connect your TikTok account first.',
+        requiresAuth: true
+      });
+    }
+
+    let videoPathForTikTok = req.file.path;
+
+    try {
+      // Step 1: Upload video to TikTok
+      const { uploadVideoToTikTok, publishVideoToTikTok } = await import('../services/tiktokService.js');
+      const publishId = await uploadVideoToTikTok(videoPathForTikTok, accessToken, { title });
+
+      // Step 2: Publish immediately
+      const publishResult = await publishVideoToTikTok(publishId, accessToken, caption, title);
+
+      // Clean up local file after successful upload
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+
+      res.json({
+        success: true,
+        message: 'Video published successfully to TikTok!',
+        publishId: publishResult.publishId,
+        videoId: publishId,
+        data: publishResult.data
+      });
+    } catch (error) {
+      // Clean up on error
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Upload and publish error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to upload and publish video',
       details: error.response?.data || null
     });
   }

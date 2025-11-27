@@ -57,8 +57,21 @@ function TikTokConnection({ account = 'primary', onConnectionChange }) {
       }
 
       // Get TikTok OAuth URL and redirect
-      const { authUrl } = await authAPI.getTikTokAuthUrl(account);
-      window.location.href = authUrl;
+      const response = await authAPI.getTikTokAuthUrl(account);
+      const { authUrl, demo } = response;
+      
+      if (demo) {
+        // Demo mode: Simulate connection without redirect
+        console.log('Demo mode: Simulating TikTok connection...');
+        // Wait a moment to simulate connection process
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Refresh connection status
+        await checkConnectionStatus();
+        setConnecting(false);
+      } else {
+        // Real mode: Redirect to TikTok
+        window.location.href = authUrl;
+      }
     } catch (error) {
       console.error('Error connecting TikTok:', error);
       setError(error.message || 'Failed to connect TikTok account');

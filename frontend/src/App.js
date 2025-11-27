@@ -89,6 +89,8 @@ function App() {
   const [tiktokConnectionModal, setTiktokConnectionModal] = useState(false);
   const [showOAuthMessage, setShowOAuthMessage] = useState(false);
   const [oauthMessage, setOauthMessage] = useState({ type: '', text: '' });
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState({ type: '', text: '' });
 
   /* THEME HANDLING */
   useEffect(() => {
@@ -107,13 +109,15 @@ function App() {
     const error = urlParams.get('error');
     const success = urlParams.get('success');
     const account = urlParams.get('account');
+    const demo = urlParams.get('demo');
 
     if (error || success) {
       setShowOAuthMessage(true);
       if (success === 'true') {
+        const demoText = demo === 'true' ? ' (Demo Mode)' : '';
         setOauthMessage({ 
           type: 'success', 
-          text: `TikTok account${account ? ` (${account})` : ''} connected successfully!` 
+          text: `TikTok account${account ? ` (${account})` : ''} connected successfully!${demoText}` 
         });
         setTiktokConnected(true);
         // Refresh connection status
@@ -200,20 +204,66 @@ function App() {
   };
 
   /* SAVE POST (TikTok for now) */
+  const showToastMessage = (type, text) => {
+    setToastMessage({ type, text });
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 5000);
+  };
+
   const handleSavePost = async (payload) => {
     const { id, title, caption, date, time, postNow, videoFile, videoUrl, account } = payload;
 
     try {
       let mediaUrl = videoUrl || null;
 
-      // If there's a video file, upload it to the backend first
+      // If posting now with video file, upload and publish immediately
+      if (videoFile && postNow) {
+        const { uploadAPI } = await import('./services/api.js');
+        try {
+          showToastMessage('info', 'Uploading video to TikTok...');
+          const publishResult = await uploadAPI.uploadAndPublish(
+            videoFile, 
+            account || 'primary', 
+            title, 
+            caption || ''
+          );
+          
+          // Show success message
+          showToastMessage('success', 'Video uploaded and published successfully to TikTok!');
+          
+          // Create post record with published status
+          const dateTime = new Date();
+          const newPost = {
+            id: Date.now(),
+            platform: "tiktok",
+            title,
+            caption,
+            dateTime,
+            status: "posted",
+            media_url: publishResult.videoId,
+            account: account || 'primary',
+          };
+          setPosts((prev) => [...prev, newPost]);
+          setModalOpen(false);
+          return;
+        } catch (error) {
+          showToastMessage('error', `Failed to publish video: ${error.message}`);
+          return;
+        }
+      }
+
+      // If there's a video file (for scheduled posts), upload it to the backend first
       if (videoFile) {
         const { uploadAPI } = await import('./services/api.js');
         try {
+          showToastMessage('info', 'Uploading video...');
           const uploadResult = await uploadAPI.uploadVideo(videoFile, account || 'primary', title);
           mediaUrl = uploadResult.filePath; // Store the file path for later posting
+          showToastMessage('success', 'Video uploaded successfully. Ready to publish.');
         } catch (error) {
-          alert(`Failed to upload video: ${error.message}`);
+          showToastMessage('error', `Failed to upload video: ${error.message}`);
           return;
         }
       }
@@ -247,7 +297,7 @@ function App() {
       setModalOpen(false);
     } catch (error) {
       console.error('Error saving post:', error);
-      alert(`Failed to save post: ${error.message}`);
+      showToastMessage('error', `Failed to save post: ${error.message}`);
     }
   };
 
@@ -413,6 +463,52 @@ function App() {
           <span style={{ fontSize: '14px', fontWeight: '500' }}>{oauthMessage.text}</span>
           <button
             onClick={() => setShowOAuthMessage(false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              padding: '4px',
+              marginLeft: 'auto'
+            }}
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      )}
+
+      {/* VIDEO UPLOAD/PUBLISH TOAST */}
+      {showToast && (
+        <div style={{
+          position: 'fixed',
+          top: showOAuthMessage ? '90px' : '20px',
+          right: '20px',
+          zIndex: 10000,
+          padding: '16px 20px',
+          borderRadius: '12px',
+          background: toastMessage.type === 'success' 
+            ? 'rgba(34, 197, 94, 0.95)'
+            : toastMessage.type === 'error'
+            ? 'rgba(239, 68, 68, 0.95)'
+            : 'rgba(59, 130, 246, 0.95)',
+          color: 'white',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          maxWidth: '400px',
+          animation: 'slideIn 0.3s ease-out'
+        }}>
+          <i className={`fa-solid ${
+            toastMessage.type === 'success' 
+              ? 'fa-check-circle' 
+              : toastMessage.type === 'error'
+              ? 'fa-exclamation-circle'
+              : 'fa-spinner fa-spin'
+          }`}></i>
+          <span style={{ fontSize: '14px', fontWeight: '500' }}>{toastMessage.text}</span>
+          <button
+            onClick={() => setShowToast(false)}
             style={{
               background: 'transparent',
               border: 'none',

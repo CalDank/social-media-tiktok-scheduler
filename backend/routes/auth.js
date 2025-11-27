@@ -93,14 +93,62 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 // TikTok OAuth - Start OAuth flow
-router.get('/tiktok/login', authenticateToken, (req, res) => {
+router.get('/tiktok/login', authenticateToken, async (req, res) => {
+  // DEMO MODE: Simulate OAuth flow without actual TikTok API
+  if (process.env.DEMO_MODE === 'true' || !process.env.TIKTOK_CLIENT_KEY) {
+    const account = req.query.account || 'primary';
+    const userId = req.user.userId;
+    
+    try {
+      const { dbGet, dbRun } = await import('../database/db.js');
+      
+      // Create mock tokens
+      const mockAccessToken = `demo_access_token_${Date.now()}`;
+      const mockRefreshToken = `demo_refresh_token_${Date.now()}`;
+      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const refreshExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+      
+      // Check if connection exists
+      const existing = await dbGet(
+        'SELECT id FROM platform_connections WHERE user_id = ? AND platform = ? AND account_name = ?',
+        [userId, 'tiktok', account]
+      );
+
+      if (existing) {
+        await dbRun(
+          `UPDATE platform_connections 
+           SET access_token = ?, refresh_token = ?, token_expires_at = ?, refresh_expires_at = ?, connected_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [mockAccessToken, mockRefreshToken, tokenExpiresAt.toISOString(), refreshExpiresAt.toISOString(), existing.id]
+        );
+      } else {
+        await dbRun(
+          `INSERT INTO platform_connections (user_id, platform, account_name, access_token, refresh_token, token_expires_at, refresh_expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [userId, 'tiktok', account, mockAccessToken, mockRefreshToken, tokenExpiresAt.toISOString(), refreshExpiresAt.toISOString()]
+        );
+      }
+      
+      console.log('🎬 DEMO MODE: TikTok account connected successfully');
+    } catch (error) {
+      console.error('Demo mode connection error:', error);
+    }
+    
+    // Return demo auth URL that simulates the flow
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const demoAuthUrl = `${frontendUrl}/auth/tiktok?demo=true&success=true&account=${account}`;
+    
+    return res.json({ 
+      authUrl: demoAuthUrl,
+      demo: true,
+      message: 'Demo mode: Simulating TikTok connection...'
+    });
+  }
+  
+  // REAL MODE: Use actual TikTok OAuth
   const clientKey = process.env.TIKTOK_CLIENT_KEY;
   const redirectUri = process.env.TIKTOK_REDIRECT_URI || 'http://localhost:5000/api/auth/tiktok/callback';
   const state = Buffer.from(JSON.stringify({ userId: req.user.userId, account: req.query.account || 'primary' })).toString('base64');
-  
-  if (!clientKey) {
-    return res.status(500).json({ error: 'TikTok Client Key not configured' });
-  }
 
   const scope = 'user.info.basic,video.upload,video.publish';
   const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
@@ -110,6 +158,17 @@ router.get('/tiktok/login', authenticateToken, (req, res) => {
 
 // TikTok OAuth - Handle callback
 router.get('/tiktok/callback', async (req, res) => {
+  // DEMO MODE: Handle demo callback
+  const isDemoMode = process.env.DEMO_MODE === 'true' || !process.env.TIKTOK_CLIENT_KEY;
+  if (isDemoMode) {
+    const { demo } = req.query;
+    if (demo === 'true') {
+      // Demo callback already handled in login route
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/tiktok?success=true&demo=true`);
+    }
+  }
+  
   try {
     const { code, state, error } = req.query;
 
@@ -187,6 +246,29 @@ router.get('/tiktok/callback', async (req, res) => {
 
 // Get TikTok connection status
 router.get('/tiktok/status', authenticateToken, async (req, res) => {
+  // DEMO MODE: Check for demo connection
+  const isDemoMode = process.env.DEMO_MODE === 'true' || !process.env.TIKTOK_CLIENT_KEY;
+  if (isDemoMode) {
+    const { dbGet } = await import('../database/db.js');
+    const account = req.query.account || 'primary';
+    const connection = await dbGet(
+      `SELECT id, connected_at, token_expires_at, refresh_expires_at 
+       FROM platform_connections 
+       WHERE user_id = ? AND platform = 'tiktok' AND account_name = ?`,
+      [req.user.userId, account]
+    );
+
+    if (connection) {
+      return res.json({
+        connected: true,
+        demo: true,
+        connectedAt: connection.connected_at,
+        expiresAt: connection.token_expires_at,
+        account: account
+      });
+    }
+    return res.json({ connected: false, demo: true });
+  }
   try {
     const account = req.query.account || 'primary';
     const connection = await dbGet(
