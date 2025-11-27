@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { authenticateToken } from '../middleware/auth.js';
 import { uploadVideoToTikTok, getValidAccessToken } from '../services/tiktokService.js';
+import { uploadToS3, generateVideoKey, deleteFromS3, isUsingS3 } from '../services/s3Storage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +13,7 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // Configure multer for video uploads
+// If using S3, we'll still need to temporarily store the file before uploading
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, '../uploads/videos');
@@ -64,24 +66,71 @@ router.post('/video', authenticateToken, upload.single('video'), async (req, res
       });
     }
 
+    // Upload to S3 (if enabled) or keep local
+    let storageLocation = req.file.path;
+    let s3Key = null;
+    
+    if (isUsingS3()) {
+      try {
+        s3Key = generateVideoKey(req.user.userId, req.file.filename);
+        const s3Result = await uploadToS3(req.file.path, s3Key, req.file.mimetype);
+        storageLocation = s3Result.location;
+        
+        // Delete local file after S3 upload
+        fs.unlinkSync(req.file.path);
+      } catch (s3Error) {
+        console.error('S3 upload failed, keeping local file:', s3Error);
+        // Continue with local storage if S3 fails
+      }
+    }
+
     // Upload to TikTok and get video_id
     try {
-      const publishId = await uploadVideoToTikTok(req.file.path, accessToken, { title });
+      // For TikTok upload, we need the actual file
+      // If using S3, we'll need to download it temporarily or stream it
+      let videoPathForTikTok = req.file.path;
       
-      // Store video info - in production, you might want to keep the file or delete it
-      // For now, we'll keep the file path for later publishing
+      if (isUsingS3() && s3Key) {
+        // Download from S3 temporarily for TikTok upload
+        const tempPath = path.join(__dirname, '../uploads/temp', req.file.filename);
+        const tempDir = path.dirname(tempPath);
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        const { downloadFromS3 } = await import('../services/s3Storage.js');
+        videoPathForTikTok = await downloadFromS3(s3Key, tempPath);
+      }
+      
+      const publishId = await uploadVideoToTikTok(videoPathForTikTok, accessToken, { title });
+      
+      // Clean up temp file if we downloaded from S3
+      if (isUsingS3() && s3Key && videoPathForTikTok !== req.file.path) {
+        try {
+          fs.unlinkSync(videoPathForTikTok);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
       
       res.json({
         success: true,
         videoId: publishId,
-        filePath: req.file.path,
+        filePath: storageLocation,
+        s3Key: s3Key,
         filename: req.file.filename,
         size: req.file.size,
+        storageType: isUsingS3() ? 's3' : 'local',
         message: 'Video uploaded successfully. Ready to publish.'
       });
     } catch (error) {
       // Clean up uploaded file on error
-      fs.unlinkSync(req.file.path);
+      if (isUsingS3() && s3Key) {
+        await deleteFromS3(s3Key);
+      } else {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      }
       throw error;
     }
   } catch (error) {
@@ -94,15 +143,28 @@ router.post('/video', authenticateToken, upload.single('video'), async (req, res
 });
 
 // Delete uploaded video file
-router.delete('/video/:filename', authenticateToken, (req, res) => {
+router.delete('/video/:key', authenticateToken, async (req, res) => {
   try {
-    const filePath = path.join(__dirname, '../uploads/videos', req.params.filename);
+    const { key } = req.params;
     
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      res.json({ message: 'Video file deleted' });
+    // Check if it's an S3 key or local filename
+    if (isUsingS3() && key.startsWith('videos/')) {
+      // It's an S3 key
+      const deleted = await deleteFromS3(key);
+      if (deleted) {
+        res.json({ message: 'Video file deleted from S3' });
+      } else {
+        res.status(404).json({ error: 'File not found in S3' });
+      }
     } else {
-      res.status(404).json({ error: 'File not found' });
+      // It's a local filename
+      const filePath = path.join(__dirname, '../uploads/videos', key);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        res.json({ message: 'Video file deleted' });
+      } else {
+        res.status(404).json({ error: 'File not found' });
+      }
     }
   } catch (error) {
     console.error('Delete video error:', error);

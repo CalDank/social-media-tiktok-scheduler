@@ -180,15 +180,51 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
 
           <div className="field-row">
             <label htmlFor="post-video">Video</label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label 
+                htmlFor="post-video-file" 
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "2px dashed rgba(0, 201, 255, 0.3)",
+                  background: "rgba(0, 201, 255, 0.05)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  gap: "8px",
+                  color: "var(--accent)",
+                  fontWeight: "500",
+                  fontSize: "13px"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0, 201, 255, 0.5)";
+                  e.currentTarget.style.background = "rgba(0, 201, 255, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0, 201, 255, 0.3)";
+                  e.currentTarget.style.background = "rgba(0, 201, 255, 0.05)";
+                }}
+              >
+                <i className="fa-solid fa-upload"></i>
+                <span>Choose Video File</span>
+              </label>
               <input
                 id="post-video-file"
                 type="file"
                 accept="video/*"
                 onChange={handleVideoFileChange}
-                style={{ marginBottom: "8px" }}
+                style={{ display: "none" }}
               />
-              <div style={{ textAlign: "center", color: "var(--text-soft)", fontSize: "12px" }}>
+              <div style={{ 
+                textAlign: "center", 
+                color: "var(--text-soft)", 
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+                fontWeight: "600"
+              }}>
                 OR
               </div>
               <input
@@ -200,15 +236,20 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
               />
             </div>
             {videoPreview && (
-              <div style={{ marginTop: "12px" }}>
+              <div style={{ 
+                marginTop: "16px",
+                borderRadius: "12px",
+                overflow: "hidden",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)"
+              }}>
                 <video
                   src={videoPreview}
                   controls
                   style={{
                     width: "100%",
-                    maxHeight: "200px",
-                    borderRadius: "4px",
-                    backgroundColor: "var(--bg-secondary)"
+                    maxHeight: "240px",
+                    display: "block"
                   }}
                 >
                   Your browser does not support the video tag.
@@ -216,8 +257,22 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
               </div>
             )}
             {videoFile && (
-              <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-soft)" }}>
-                Selected: {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
+              <div style={{ 
+                marginTop: "12px", 
+                fontSize: "12px", 
+                color: "var(--text-soft)",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                background: "rgba(0, 201, 255, 0.08)",
+                border: "1px solid rgba(0, 201, 255, 0.2)",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}>
+                <i className="fa-solid fa-file-video" style={{ color: "var(--accent)" }}></i>
+                <span>
+                  <strong>{videoFile.name}</strong> ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
+                </span>
               </div>
             )}
           </div>

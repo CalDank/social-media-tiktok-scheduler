@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import TikTokConnection from "./TikTokConnection";
 
 function formatDate(d) {
   return d.toLocaleDateString(undefined, {
@@ -15,6 +16,30 @@ function formatTime(d) {
 }
 
 function Sidebar({ filteredPosts, filter, setFilter, onEditPost }) {
+  const [showConnection, setShowConnection] = useState(false);
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+
+  useEffect(() => {
+    checkTikTokConnection();
+  }, []);
+
+  const checkTikTokConnection = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setTiktokConnected(false);
+        return;
+      }
+
+      const { authAPI } = await import('../services/api.js');
+      const status = await authAPI.getTikTokStatus('primary');
+      setTiktokConnected(status.connected || false);
+    } catch (error) {
+      console.error('Error checking TikTok connection:', error);
+      setTiktokConnected(false);
+    }
+  };
+
   const handleFilterClick = (value) => {
     setFilter(value);
   };
@@ -22,10 +47,47 @@ function Sidebar({ filteredPosts, filter, setFilter, onEditPost }) {
   return (
     <>
       <h2 className="panel-title">Scheduled TikTok posts</h2>
-      <p className="panel-subtitle">
-        Frontend-only prototype. In production this would be backed by an API
-        and TikTok posting service.
-      </p>
+      
+      {/* TikTok Connection Section */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          marginBottom: '8px'
+        }}>
+          <p className="panel-subtitle" style={{ margin: 0 }}>
+            {tiktokConnected 
+              ? '✓ TikTok account connected' 
+              : '⚠ TikTok account not connected'}
+          </p>
+          <button
+            onClick={() => setShowConnection(!showConnection)}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '6px',
+              padding: '6px 12px',
+              color: 'var(--text)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            {showConnection ? 'Hide' : 'Manage'}
+          </button>
+        </div>
+        
+        {showConnection && (
+          <TikTokConnection 
+            account="primary"
+            onConnectionChange={(connected) => {
+              setTiktokConnected(connected);
+              checkTikTokConnection();
+            }}
+          />
+        )}
+      </div>
 
       <div id="post-filters" className="chip-row">
         {["all", "scheduled", "posted", "failed"].map((value) => (

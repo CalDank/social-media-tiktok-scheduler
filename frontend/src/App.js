@@ -3,6 +3,7 @@ import "./index.css";
 import Calendar from "./components/Calendar";
 import Sidebar from "./components/Sidebar";
 import PostModal from "./components/PostModal";
+import TikTokConnection from "./components/TikTokConnection";
 
 /*
   MULTI-PLATFORM READY DESIGN
@@ -84,6 +85,10 @@ function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
   const [defaultDate, setDefaultDate] = useState(new Date());
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [tiktokConnectionModal, setTiktokConnectionModal] = useState(false);
+  const [showOAuthMessage, setShowOAuthMessage] = useState(false);
+  const [oauthMessage, setOauthMessage] = useState({ type: '', text: '' });
 
   /* THEME HANDLING */
   useEffect(() => {
@@ -93,6 +98,69 @@ function App() {
     } else {
       document.body.classList.add("theme-dark");
     }
+  }, []);
+
+  /* HANDLE TIKTOK OAUTH CALLBACK */
+  useEffect(() => {
+    // Check if we're returning from TikTok OAuth
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const success = urlParams.get('success');
+    const account = urlParams.get('account');
+
+    if (error || success) {
+      setShowOAuthMessage(true);
+      if (success === 'true') {
+        setOauthMessage({ 
+          type: 'success', 
+          text: `TikTok account${account ? ` (${account})` : ''} connected successfully!` 
+        });
+        setTiktokConnected(true);
+        // Refresh connection status
+        checkTikTokConnection();
+      } else {
+        const errorMessages = {
+          'no_code': 'TikTok authorization was cancelled or incomplete.',
+          'token_failed': 'Failed to authenticate with TikTok. Please try again.',
+          'callback_error': 'An error occurred during authentication.',
+        };
+        setOauthMessage({ 
+          type: 'error', 
+          text: errorMessages[error] || `Error: ${error}` 
+        });
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Hide message after 5 seconds
+      setTimeout(() => {
+        setShowOAuthMessage(false);
+      }, 5000);
+    }
+  }, []);
+
+  /* CHECK TIKTOK CONNECTION STATUS */
+  const checkTikTokConnection = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setTiktokConnected(false);
+        return;
+      }
+
+      const { authAPI } = await import('./services/api.js');
+      const status = await authAPI.getTikTokStatus('primary');
+      setTiktokConnected(status.connected || false);
+    } catch (error) {
+      console.error('Error checking TikTok connection:', error);
+      setTiktokConnected(false);
+    }
+  };
+
+  // Check connection status on mount
+  useEffect(() => {
+    checkTikTokConnection();
   }, []);
 
   const toggleTheme = () => {
@@ -206,41 +274,44 @@ function App() {
         </div>
 
         <div className="topbar-actions">
-          {/* Platform toggle UI (future) */}
+          {/* Platform toggle UI */}
           {SUPPORTED_PLATFORMS.map((p) => (
             <button
               key={p.id}
               className="icon-button"
               style={{
                 opacity: p.enabled ? 1 : 0.3,
-                color: p.enabled ? p.color : "var(--text-soft)",
+                color: p.enabled 
+                  ? (p.id === 'tiktok' && tiktokConnected ? p.color : 'var(--text-soft)')
+                  : "var(--text-soft)",
+                position: 'relative'
               }}
               title={
-                p.enabled
+                p.id === 'tiktok' && p.enabled
+                  ? (tiktokConnected ? `${p.name} connected` : `Connect ${p.name} account`)
+                  : p.enabled
                   ? `${p.name} connected`
                   : `${p.name} coming soon`
               }
               onClick={async () => {
                 if (p.id === 'tiktok' && p.enabled) {
-                  // Check TikTok connection status
-                  try {
-                    const { authAPI } = await import('./services/api.js');
-                    const status = await authAPI.getTikTokStatus('primary');
-                    if (!status.connected) {
-                      // Start OAuth flow
-                      const { authUrl } = await authAPI.getTikTokAuthUrl('primary');
-                      window.location.href = authUrl;
-                    } else {
-                      alert('TikTok account is already connected!');
-                    }
-                  } catch (error) {
-                    console.error('TikTok connection error:', error);
-                    alert('Failed to check TikTok connection status');
-                  }
+                  setTiktokConnectionModal(true);
                 }
               }}
             >
               <i className={p.icon}></i>
+              {p.id === 'tiktok' && tiktokConnected && (
+                <span style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#22c55e',
+                  border: '2px solid var(--bg)'
+                }}></span>
+              )}
             </button>
           ))}
 
@@ -317,6 +388,94 @@ function App() {
           />
         </aside>
       </main>
+
+      {/* OAUTH MESSAGE TOAST */}
+      {showOAuthMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 10000,
+          padding: '16px 20px',
+          borderRadius: '12px',
+          background: oauthMessage.type === 'success' 
+            ? 'rgba(34, 197, 94, 0.95)' 
+            : 'rgba(239, 68, 68, 0.95)',
+          color: 'white',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          maxWidth: '400px',
+          animation: 'slideIn 0.3s ease-out'
+        }}>
+          <i className={`fa-solid ${oauthMessage.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+          <span style={{ fontSize: '14px', fontWeight: '500' }}>{oauthMessage.text}</span>
+          <button
+            onClick={() => setShowOAuthMessage(false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              padding: '4px',
+              marginLeft: 'auto'
+            }}
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      )}
+
+      {/* TIKTOK CONNECTION MODAL */}
+      {tiktokConnectionModal && (
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target.className === 'modal-backdrop') {
+              setTiktokConnectionModal(false);
+            }
+          }}
+        >
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3>Connect TikTok Account</h3>
+              <button 
+                className="icon-button" 
+                onClick={() => setTiktokConnectionModal(false)}
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div className="modal-body">
+              <TikTokConnection 
+                account="primary"
+                onConnectionChange={(connected) => {
+                  setTiktokConnected(connected);
+                  if (connected) {
+                    setTimeout(() => setTiktokConnectionModal(false), 1500);
+                  }
+                }}
+              />
+              <div style={{
+                marginTop: '16px',
+                padding: '12px',
+                borderRadius: '8px',
+                background: 'rgba(0, 201, 255, 0.05)',
+                border: '1px solid rgba(0, 201, 255, 0.2)',
+                fontSize: '12px',
+                color: 'var(--text-soft)'
+              }}>
+                <strong style={{ color: 'var(--text)' }}>What you'll need:</strong>
+                <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                  <li>A TikTok Business or Creator account</li>
+                  <li>Permission to post videos on your account</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL */}
       <PostModal

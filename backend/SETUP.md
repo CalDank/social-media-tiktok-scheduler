@@ -32,6 +32,13 @@
 
    # CORS
    FRONTEND_URL=http://localhost:3000
+
+   # AWS S3 Configuration (for production)
+   # USE_S3_STORAGE=false
+   # AWS_REGION=us-east-1
+   # AWS_S3_BUCKET_NAME=your-bucket-name
+   # AWS_ACCESS_KEY_ID=your_access_key
+   # AWS_SECRET_ACCESS_KEY=your_secret_key
    ```
 
 4. **Initialize database (optional - auto-initializes on first run):**

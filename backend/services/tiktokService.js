@@ -1,7 +1,13 @@
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { dbGet, dbRun } from '../database/db.js';
+import { downloadFromS3, isUsingS3 } from './s3Storage.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const TIKTOK_API_BASE = 'https://open.tiktokapis.com/v2';
 
@@ -93,8 +99,26 @@ export async function getValidAccessToken(userId, account) {
 /**
  * Upload video to TikTok and get video_id
  */
-export async function uploadVideoToTikTok(videoPath, accessToken, postInfo = {}) {
+export async function uploadVideoToTikTok(videoPathOrS3Key, accessToken, postInfo = {}) {
   try {
+    // Handle S3 storage - download file if needed
+    let videoPath = videoPathOrS3Key;
+    
+    if (isUsingS3() && videoPathOrS3Key.startsWith('s3://') || videoPathOrS3Key.startsWith('videos/')) {
+      // It's an S3 key, download it temporarily
+      const tempPath = path.join(__dirname, '../uploads/temp', `temp-${Date.now()}-${Math.random().toString(36).substring(7)}.mp4`);
+      const tempDir = path.dirname(tempPath);
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      
+      const s3Key = videoPathOrS3Key.startsWith('s3://') 
+        ? videoPathOrS3Key.replace(/^s3:\/\/[^/]+\//, '')
+        : videoPathOrS3Key;
+      
+      videoPath = await downloadFromS3(s3Key, tempPath);
+    }
+    
     // Step 1: Initialize video upload
     const initResponse = await axios.post(
       `${TIKTOK_API_BASE}/post/publish/video/init/`,
@@ -159,8 +183,25 @@ export async function uploadVideoToTikTok(videoPath, accessToken, postInfo = {})
     // Wait a bit and check status
     await new Promise(resolve => setTimeout(resolve, 2000));
 
+    // Clean up temp file if we downloaded from S3
+    if (isUsingS3() && videoPath !== videoPathOrS3Key && fs.existsSync(videoPath)) {
+      try {
+        fs.unlinkSync(videoPath);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+
     return publish_id;
   } catch (error) {
+    // Clean up temp file on error
+    if (isUsingS3() && videoPath !== videoPathOrS3Key && fs.existsSync(videoPath)) {
+      try {
+        fs.unlinkSync(videoPath);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
     console.error('Video upload error:', error.response?.data || error.message);
     throw error;
   }
