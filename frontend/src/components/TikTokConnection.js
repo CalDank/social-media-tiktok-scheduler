@@ -48,12 +48,30 @@ function TikTokConnection({ account = 'primary', onConnectionChange }) {
     try {
       setConnecting(true);
       setError(null);
-      const token = localStorage.getItem('authToken');
+      let token = localStorage.getItem('authToken');
       
+      // If no token, try auto-login first
       if (!token) {
-        setError('Please log in to your account first');
-        setConnecting(false);
-        return;
+        try {
+          const { authAPI: auth } = await import('../services/api.js');
+          try {
+            await auth.login('demo@example.com', 'demo123');
+            token = localStorage.getItem('authToken');
+          } catch (loginError) {
+            try {
+              await auth.register('demo@example.com', 'demo123');
+              token = localStorage.getItem('authToken');
+            } catch (registerError) {
+              setError('Please log in to your account first. Auto-login failed.');
+              setConnecting(false);
+              return;
+            }
+          }
+        } catch (error) {
+          setError('Please log in to your account first');
+          setConnecting(false);
+          return;
+        }
       }
 
       // Get TikTok OAuth URL and redirect
@@ -74,7 +92,7 @@ function TikTokConnection({ account = 'primary', onConnectionChange }) {
       }
     } catch (error) {
       console.error('Error connecting TikTok:', error);
-      setError(error.message || 'Failed to connect TikTok account');
+      setError(error.message || 'Failed to connect TikTok account. Make sure you are logged in.');
       setConnecting(false);
     }
   };

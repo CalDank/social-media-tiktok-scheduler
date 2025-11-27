@@ -162,9 +162,37 @@ function App() {
     }
   };
 
-  // Check connection status on mount
+  // Auto-login for demo mode on mount
   useEffect(() => {
-    checkTikTokConnection();
+    const autoLogin = async () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        try {
+          // Try to auto-login with demo account
+          const { authAPI } = await import('./services/api.js');
+          try {
+            // Try login first
+            await authAPI.login('demo@example.com', 'demo123');
+          } catch (loginError) {
+            // If login fails, try to register
+            try {
+              await authAPI.register('demo@example.com', 'demo123');
+            } catch (registerError) {
+              // If register also fails, ignore - user can login manually
+              console.log('Auto-login skipped - please login manually');
+            }
+          }
+          // Check TikTok connection after login
+          checkTikTokConnection();
+        } catch (error) {
+          console.log('Auto-login failed, please login manually:', error);
+        }
+      } else {
+        // Already logged in, check TikTok connection
+        checkTikTokConnection();
+      }
+    };
+    autoLogin();
   }, []);
 
   const toggleTheme = () => {
@@ -221,7 +249,24 @@ function App() {
       // If posting now with video file, upload and publish immediately
       if (videoFile && postNow) {
         const { uploadAPI } = await import('./services/api.js');
+        const { authAPI } = await import('./services/api.js');
+        
         try {
+          // Ensure user is authenticated
+          let token = localStorage.getItem('authToken');
+          if (!token) {
+            try {
+              await authAPI.login('demo@example.com', 'demo123');
+            } catch (loginError) {
+              try {
+                await authAPI.register('demo@example.com', 'demo123');
+              } catch (registerError) {
+                showToastMessage('error', 'Please connect your TikTok account first');
+                return;
+              }
+            }
+          }
+          
           showToastMessage('info', 'Uploading video to TikTok...');
           const publishResult = await uploadAPI.uploadAndPublish(
             videoFile, 
