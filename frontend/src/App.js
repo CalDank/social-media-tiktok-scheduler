@@ -5,6 +5,8 @@ import Sidebar from "./components/Sidebar";
 import PostModal from "./components/PostModal";
 import TikTokConnection from "./components/TikTokConnection";
 
+<h1 style={{ color: "red" }}>THIS IS THE NEW VERSION</h1>
+
 /*
   MULTI-PLATFORM READY DESIGN
   ---------------------------
