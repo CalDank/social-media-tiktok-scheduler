@@ -753,14 +753,23 @@ select {
 
 .modal-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
   background: rgba(3, 4, 6, 0.85);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 40;
+  z-index: 9999;
   animation: fadeIn 0.2s ease-out;
+  overflow-y: auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .modal {
@@ -1244,6 +1253,15 @@ body {
   .modal-footer .btn {
     width: 100%;
     justify-content: center;
+  }
+
+  /* Multiple buttons in footer on mobile */
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .modal-footer .btn:not(:last-child) {
+    margin-bottom: 0;
   }
 
   .chip-row {

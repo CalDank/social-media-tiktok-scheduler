@@ -26,6 +26,20 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
   const [videoPreview, setVideoPreview] = useState(null);
 
   useEffect(() => {
+    // Prevent body scroll when modal is open
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     const baseDate = defaultDate || new Date();
@@ -150,12 +164,35 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
 
   if (!isOpen) return null;
 
+  const handlePostImmediately = () => {
+    if (!title.trim()) {
+      alert("Please fill in the title.");
+      return;
+    }
+
+    // Post immediately with current form data
+    onSave({
+      id: editingPost ? editingPost.id : null,
+      title: title.trim(),
+      caption: caption.trim(),
+      date: date || toDateInputValue(new Date()),
+      time: time || toTimeInputValue(new Date()),
+      account,
+      postNow: true,
+      saveAsDraft: false,
+      videoFile: videoFile,
+      videoUrl: videoUrl.trim() || null
+    });
+  };
+
   return (
     <div
       id="modal-backdrop"
       className="modal-backdrop"
       onClick={(e) => {
-        if (e.target.id === "modal-backdrop") onClose();
+        if (e.target.id === "modal-backdrop" || e.target.className === "modal-backdrop") {
+          onClose();
+        }
       }}
     >
       <div className="modal">
@@ -378,6 +415,19 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
             >
               Cancel
             </button>
+            {editingPost && editingPost.status === "draft" && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handlePostImmediately}
+                style={{ 
+                  background: 'linear-gradient(135deg, #00c9ff 0%, #ff67e0 100%)'
+                }}
+              >
+                <i className="fa-solid fa-paper-plane" style={{ marginRight: '6px' }}></i>
+                Post Immediately
+              </button>
+            )}
             {saveAsDraft ? (
               <button type="submit" className="btn btn-primary" style={{ background: 'var(--text-soft)' }}>
                 Save as Draft
