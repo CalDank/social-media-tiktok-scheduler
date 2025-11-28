@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 function toDateInputValue(d) {
   const year = d.getFullYear();
@@ -28,15 +29,24 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
   useEffect(() => {
     // Prevent body scroll when modal is open
     if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPosition = document.body.style.position;
+      const scrollY = window.scrollY;
+      
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${scrollY}px`;
+      
+      // Cleanup on unmount
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.position = originalPosition;
+        document.body.style.width = '';
+        document.body.style.top = '';
+        window.scrollTo(0, scrollY);
+      };
     }
-
-    // Cleanup on unmount
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -162,8 +172,6 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
     });
   };
 
-  if (!isOpen) return null;
-
   const handlePostImmediately = () => {
     if (!title.trim()) {
       alert("Please fill in the title.");
@@ -185,12 +193,16 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
     });
   };
 
-  return (
+  if (!isOpen) return null;
+
+  const modalContent = (
     <div
       id="modal-backdrop"
       className="modal-backdrop"
       onClick={(e) => {
-        if (e.target.id === "modal-backdrop" || e.target.className === "modal-backdrop") {
+        // Close if clicking directly on backdrop (not on modal content)
+        if (e.target.id === "modal-backdrop" || 
+            (e.target.classList && e.target.classList.contains("modal-backdrop"))) {
           onClose();
         }
       }}
@@ -222,10 +234,11 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
             <label htmlFor="post-caption">TikTok caption</label>
             <textarea
               id="post-caption"
-              rows="3"
+              rows="2"
               placeholder="Write the actual TikTok caption here..."
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
+              style={{ resize: 'none' }}
             ></textarea>
           </div>
 
@@ -234,23 +247,23 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
               Video 
               <span style={{ color: 'var(--text-soft)', fontSize: '11px', fontWeight: 'normal', marginLeft: '4px' }}>(optional - test mode)</span>
             </label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <label 
                 htmlFor="post-video-file" 
                 style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  padding: "12px",
-                  borderRadius: "12px",
+                  padding: "10px",
+                  borderRadius: "10px",
                   border: "2px dashed rgba(0, 201, 255, 0.3)",
                   background: "rgba(0, 201, 255, 0.05)",
                   cursor: "pointer",
                   transition: "all 0.2s ease",
-                  gap: "8px",
+                  gap: "6px",
                   color: "var(--accent)",
                   fontWeight: "500",
-                  fontSize: "13px"
+                  fontSize: "12px"
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = "rgba(0, 201, 255, 0.5)";
@@ -291,18 +304,18 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
             </div>
             {videoPreview && (
               <div style={{ 
-                marginTop: "16px",
-                borderRadius: "12px",
+                marginTop: "8px",
+                borderRadius: "8px",
                 overflow: "hidden",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)"
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)"
               }}>
                 <video
                   src={videoPreview}
                   controls
                   style={{
                     width: "100%",
-                    maxHeight: "240px",
+                    maxHeight: "120px",
                     display: "block"
                   }}
                 >
@@ -442,6 +455,9 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
       </div>
     </div>
   );
+
+  // Render modal using portal to body, outside of app container
+  return createPortal(modalContent, document.body);
 }
 
 export default PostModal;
