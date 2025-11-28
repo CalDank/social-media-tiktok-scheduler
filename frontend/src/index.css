@@ -758,10 +758,10 @@ select {
   right: 0 !important;
   bottom: 0 !important;
   width: 100vw !important;
-  height: 100vh !important;
+  height: 100% !important;
   min-height: 100vh !important;
   max-width: 100vw !important;
-  max-height: 100vh !important;
+  max-height: none !important;
   margin: 0 !important;
   padding: 10px;
   background: rgba(3, 4, 6, 0.85) !important;
@@ -773,6 +773,8 @@ select {
   animation: fadeIn 0.2s ease-out;
   overflow: hidden !important;
   box-sizing: border-box;
+  /* Ensure it covers entire document height */
+  inset: 0 !important;
 }
 
 .modal {
@@ -922,24 +924,57 @@ select {
 
 /* --------- SCROLLBAR STYLING --------- */
 
-/* Hide vertical scrollbar but keep scrolling functionality */
-::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
-  background: transparent;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
-/* Firefox scrollbar - hide it */
+/* Hide ALL scrollbars completely */
 * {
-  scrollbar-width: none;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-track {
+  display: none !important;
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  display: none !important;
+  background: transparent !important;
+}
+
+/* Hide scrollbars on specific elements */
+html, body {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  overflow-x: hidden !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Hide scrollbars but keep scrolling functionality for modal body */
+.modal-body::-webkit-scrollbar {
+  width: 4px;
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.modal-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   -ms-overflow-style: none;
 }
 

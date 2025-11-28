@@ -27,23 +27,49 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
   const [videoPreview, setVideoPreview] = useState(null);
 
   useEffect(() => {
-    // Prevent body scroll when modal is open
+    // Prevent body scroll when modal is open and ensure backdrop covers full document
     if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      const originalPosition = document.body.style.position;
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalBodyPosition = document.body.style.position;
+      const originalBodyWidth = document.body.style.width;
+      const originalBodyTop = document.body.style.top;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
       const scrollY = window.scrollY;
       
+      // Calculate full document height (including scrollable content)
+      const documentHeight = Math.max(
+        document.body.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.clientHeight,
+        document.documentElement.scrollHeight,
+        document.documentElement.offsetHeight
+      );
+      
+      // Lock body
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
       document.body.style.top = `-${scrollY}px`;
       
+      // Lock html
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Set backdrop to cover full document height after a brief delay to ensure it's rendered
+      setTimeout(() => {
+        const backdrop = document.getElementById('modal-backdrop');
+        if (backdrop) {
+          backdrop.style.height = `${documentHeight}px`;
+          backdrop.style.minHeight = `${documentHeight}px`;
+        }
+      }, 0);
+      
       // Cleanup on unmount
       return () => {
-        document.body.style.overflow = originalOverflow;
-        document.body.style.position = originalPosition;
-        document.body.style.width = '';
-        document.body.style.top = '';
+        document.body.style.overflow = originalBodyOverflow;
+        document.body.style.position = originalBodyPosition;
+        document.body.style.width = originalBodyWidth;
+        document.body.style.top = originalBodyTop;
+        document.documentElement.style.overflow = originalHtmlOverflow;
         window.scrollTo(0, scrollY);
       };
     }
@@ -205,6 +231,25 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
             (e.target.classList && e.target.classList.contains("modal-backdrop"))) {
           onClose();
         }
+      }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100%',
+        minHeight: '100vh',
+        margin: 0,
+        padding: '10px',
+        background: 'rgba(3, 4, 6, 0.85)',
+        zIndex: 99999,
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        // Ensure it covers the entire document, not just viewport
+        maxWidth: '100vw',
+        maxHeight: 'none'
       }}
     >
       <div className="modal">
