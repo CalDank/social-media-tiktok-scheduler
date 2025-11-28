@@ -46,9 +46,9 @@ function Sidebar({ filteredPosts, filter, setFilter, onEditPost }) {
 
   return (
     <>
-      <h2 className="panel-title">Scheduled TikTok posts</h2>
+      <h2 className="panel-title">Scheduled Posts</h2>
       
-      {/* TikTok Connection Section */}
+      {/* TikTok Connection Section - Optional for testing */}
       <div style={{ marginBottom: '20px' }}>
         <div style={{ 
           display: 'flex', 
@@ -59,7 +59,7 @@ function Sidebar({ filteredPosts, filter, setFilter, onEditPost }) {
           <p className="panel-subtitle" style={{ margin: 0 }}>
             {tiktokConnected 
               ? '✓ TikTok account connected' 
-              : '⚠ TikTok account not connected'}
+              : '🧪 Test Mode - TikTok optional'}
           </p>
           <button
             onClick={() => setShowConnection(!showConnection)}
@@ -90,7 +90,7 @@ function Sidebar({ filteredPosts, filter, setFilter, onEditPost }) {
       </div>
 
       <div id="post-filters" className="chip-row">
-        {["all", "scheduled", "posted", "failed"].map((value) => (
+        {["all", "draft", "scheduled", "posted", "failed"].map((value) => (
           <button
             key={value}
             className={`chip ${filter === value ? "chip-active" : ""}`}
@@ -128,7 +128,13 @@ function Sidebar({ filteredPosts, filter, setFilter, onEditPost }) {
                 <div className="post-card-caption">{post.caption}</div>
                 <div className="post-card-meta-row">
                   <span>
-                    {formatDate(post.dateTime)} · {formatTime(post.dateTime)}
+                    {post.dateTime ? (
+                      <>
+                        {formatDate(post.dateTime)} · {formatTime(post.dateTime)}
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--text-soft)', fontStyle: 'italic' }}>No date set</span>
+                    )}
                   </span>
                   <span className={`post-status ${post.status}`}>
                     {post.status}

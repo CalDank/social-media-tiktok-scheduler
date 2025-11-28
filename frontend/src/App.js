@@ -4,6 +4,7 @@ import Calendar from "./components/Calendar";
 import Sidebar from "./components/Sidebar";
 import PostModal from "./components/PostModal";
 import TikTokConnection from "./components/TikTokConnection";
+import TikTokLogin from "./components/TikTokLogin";
 
 /*
   MULTI-PLATFORM READY DESIGN
@@ -91,6 +92,8 @@ function App() {
   const [oauthMessage, setOauthMessage] = useState({ type: '', text: '' });
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState({ type: '', text: '' });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   /* THEME HANDLING */
   useEffect(() => {
@@ -106,33 +109,50 @@ function App() {
   useEffect(() => {
     // Check if we're returning from TikTok OAuth
     const urlParams = new URLSearchParams(window.location.search);
-    const error = urlParams.get('error');
     const success = urlParams.get('success');
-    const account = urlParams.get('account');
+    const error = urlParams.get('error');
     const demo = urlParams.get('demo');
-
-    if (error || success) {
-      setShowOAuthMessage(true);
-      if (success === 'true') {
-        const demoText = demo === 'true' ? ' (Demo Mode)' : '';
+    
+    // If successful login, refresh connection status and redirect to app
+    if (success === 'true') {
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Check connection status
+      checkTikTokConnection().then(() => {
+        // Set authenticated after a brief delay to ensure connection is checked
+        setTimeout(() => {
+          setIsAuthenticated(true);
+        }, 500);
+      });
+      
+      // Show success message
+      if (demo === 'true') {
+        setShowOAuthMessage(true);
         setOauthMessage({ 
           type: 'success', 
-          text: `TikTok account${account ? ` (${account})` : ''} connected successfully!${demoText}` 
+          text: 'Successfully logged in with TikTok! (Demo Mode)' 
         });
-        setTiktokConnected(true);
-        // Refresh connection status
-        checkTikTokConnection();
       } else {
-        const errorMessages = {
-          'no_code': 'TikTok authorization was cancelled or incomplete.',
-          'token_failed': 'Failed to authenticate with TikTok. Please try again.',
-          'callback_error': 'An error occurred during authentication.',
-        };
+        setShowOAuthMessage(true);
         setOauthMessage({ 
-          type: 'error', 
-          text: errorMessages[error] || `Error: ${error}` 
+          type: 'success', 
+          text: 'Successfully logged in with TikTok!' 
         });
       }
+    }
+    
+    if (error) {
+      setShowOAuthMessage(true);
+      const errorMessages = {
+        'no_code': 'TikTok authorization was cancelled or incomplete.',
+        'token_failed': 'Failed to authenticate with TikTok. Please try again.',
+        'callback_error': 'An error occurred during authentication.',
+      };
+      setOauthMessage({ 
+        type: 'error', 
+        text: errorMessages[error] || `Error: ${error}` 
+      });
       
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -150,50 +170,84 @@ function App() {
       const token = localStorage.getItem('authToken');
       if (!token) {
         setTiktokConnected(false);
+        setIsAuthenticated(false);
         return;
       }
 
       const { authAPI } = await import('./services/api.js');
       const status = await authAPI.getTikTokStatus('primary');
-      setTiktokConnected(status.connected || false);
+      const connected = status.connected || false;
+      setTiktokConnected(connected);
+      setIsAuthenticated(connected);
     } catch (error) {
       console.error('Error checking TikTok connection:', error);
       setTiktokConnected(false);
+      setIsAuthenticated(false);
     }
   };
 
-  // Auto-login for demo mode on mount
+  // Check authentication and TikTok connection status on mount
   useEffect(() => {
-    const autoLogin = async () => {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        try {
-          // Try to auto-login with demo account
-          const { authAPI } = await import('./services/api.js');
+    const checkAuthStatus = async () => {
+      setCheckingAuth(true);
+      try {
+        const token = localStorage.getItem('authToken');
+        
+        if (token) {
+          // Have token, check TikTok connection (but don't require it for testing)
           try {
-            // Try login first
-            await authAPI.login('demo@example.com', 'demo123');
-          } catch (loginError) {
-            // If login fails, try to register
-            try {
-              await authAPI.register('demo@example.com', 'demo123');
-            } catch (registerError) {
-              // If register also fails, ignore - user can login manually
-              console.log('Auto-login skipped - please login manually');
-            }
+            await checkTikTokConnection();
+          } catch (error) {
+            console.log('TikTok connection check failed, continuing in test mode');
           }
-          // Check TikTok connection after login
-          checkTikTokConnection();
-        } catch (error) {
-          console.log('Auto-login failed, please login manually:', error);
+          // Allow access even without TikTok connection for testing
+          setIsAuthenticated(true);
+          setCheckingAuth(false);
+        } else {
+          // No token, try auto-login with demo account
+          try {
+            const { authAPI } = await import('./services/api.js');
+            try {
+              await authAPI.login('demo@example.com', 'demo123');
+              setIsAuthenticated(true);
+              setCheckingAuth(false);
+            } catch (loginError) {
+              // If login fails, try registering
+              try {
+                await authAPI.register('demo@example.com', 'demo123');
+                setIsAuthenticated(true);
+                setCheckingAuth(false);
+              } catch (registerError) {
+                // If both fail, still allow access for testing (local mode)
+                console.log('Auto-login failed, allowing test mode access');
+                setIsAuthenticated(true);
+                setCheckingAuth(false);
+              }
+            }
+          } catch (error) {
+            console.error('Auth setup error:', error);
+            // Still allow access for testing
+            setIsAuthenticated(true);
+            setCheckingAuth(false);
+          }
         }
-      } else {
-        // Already logged in, check TikTok connection
-        checkTikTokConnection();
+      } catch (error) {
+        console.error('Auth check error:', error);
+        // Allow access even on error for testing
+        setIsAuthenticated(true);
+        setCheckingAuth(false);
       }
     };
-    autoLogin();
+    
+    checkAuthStatus();
   }, []);
+
+  // Update authentication state when TikTok connection changes (but don't require it)
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    // Allow access even without TikTok connection for testing
+    setIsAuthenticated(!!token || true); // Always allow for testing
+  }, [tiktokConnected]);
 
   const toggleTheme = () => {
     const body = document.body;
@@ -241,42 +295,67 @@ function App() {
   };
 
   const handleSavePost = async (payload) => {
-    const { id, title, caption, date, time, postNow, videoFile, videoUrl, account } = payload;
+    const { id, title, caption, date, time, postNow, saveAsDraft, videoFile, videoUrl, account } = payload;
 
     try {
       let mediaUrl = videoUrl || null;
 
-      // If posting now with video file, upload and publish immediately
-      if (videoFile && postNow) {
-        const { uploadAPI } = await import('./services/api.js');
-        const { authAPI } = await import('./services/api.js');
-        
-        try {
-          // Ensure user is authenticated
-          let token = localStorage.getItem('authToken');
-          if (!token) {
-            try {
-              await authAPI.login('demo@example.com', 'demo123');
-            } catch (loginError) {
-              try {
-                await authAPI.register('demo@example.com', 'demo123');
-              } catch (registerError) {
-                showToastMessage('error', 'Please connect your TikTok account first');
-                return;
-              }
-            }
+      // Handle draft posts - skip video upload if not provided
+      if (saveAsDraft) {
+        // For drafts, upload video if provided but don't require it
+        if (videoFile) {
+          const { uploadAPI } = await import('./services/api.js');
+          try {
+            showToastMessage('info', 'Uploading video...');
+            const uploadResult = await uploadAPI.uploadVideo(videoFile, account || 'primary', title);
+            mediaUrl = uploadResult.filePath;
+            showToastMessage('success', 'Video uploaded successfully.');
+          } catch (error) {
+            showToastMessage('error', `Failed to upload video: ${error.message}`);
+            // Continue anyway for drafts
           }
-          
-          showToastMessage('info', 'Uploading video to TikTok...');
-          const publishResult = await uploadAPI.uploadAndPublish(
-            videoFile, 
-            account || 'primary', 
-            title, 
-            caption || ''
+        }
+
+        const dateTime = (date && time) ? new Date(`${date}T${time}`) : null;
+        const status = "draft";
+
+        if (id) {
+          setPosts((prev) =>
+            prev.map((p) =>
+              p.id === id
+                ? { ...p, title, caption, dateTime, status, media_url: mediaUrl, account: account || 'primary' }
+                : p
+            )
           );
+        } else {
+          const newPost = {
+            id: Date.now(),
+            platform: "tiktok",
+            title,
+            caption,
+            dateTime,
+            status,
+            media_url: mediaUrl,
+            account: account || 'primary',
+          };
+          setPosts((prev) => [...prev, newPost]);
+        }
+        showToastMessage('success', 'Draft saved successfully!');
+        setModalOpen(false);
+        return;
+      }
+
+      // For testing: Skip actual TikTok upload/publish
+      // If posting now with video file, simulate upload and publish
+      if (videoFile && postNow) {
+        try {
+          showToastMessage('info', 'Simulating video upload... (Test Mode)');
+          
+          // Simulate upload delay
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Show success message
-          showToastMessage('success', 'Video uploaded and published successfully to TikTok!');
+          showToastMessage('success', 'Post created successfully! (Test Mode - TikTok integration disabled)');
           
           // Create post record with published status
           const dateTime = new Date();
@@ -287,33 +366,32 @@ function App() {
             caption,
             dateTime,
             status: "posted",
-            media_url: publishResult.videoId,
+            media_url: videoFile.name || "test_video.mp4",
             account: account || 'primary',
           };
           setPosts((prev) => [...prev, newPost]);
           setModalOpen(false);
           return;
         } catch (error) {
-          showToastMessage('error', `Failed to publish video: ${error.message}`);
+          showToastMessage('error', `Failed to create post: ${error.message}`);
           return;
         }
       }
 
-      // If there's a video file (for scheduled posts), upload it to the backend first
+      // If there's a video file (for scheduled posts), simulate upload
       if (videoFile) {
-        const { uploadAPI } = await import('./services/api.js');
         try {
-          showToastMessage('info', 'Uploading video...');
-          const uploadResult = await uploadAPI.uploadVideo(videoFile, account || 'primary', title);
-          mediaUrl = uploadResult.filePath; // Store the file path for later posting
-          showToastMessage('success', 'Video uploaded successfully. Ready to publish.');
+          showToastMessage('info', 'Simulating video upload... (Test Mode)');
+          await new Promise(resolve => setTimeout(resolve, 800));
+          mediaUrl = videoFile.name || "test_video.mp4"; // Store file name for testing
+          showToastMessage('success', 'Video ready for scheduling. (Test Mode)');
         } catch (error) {
-          showToastMessage('error', `Failed to upload video: ${error.message}`);
-          return;
+          showToastMessage('error', `Failed to process video: ${error.message}`);
+          // Continue anyway for testing
         }
       }
 
-      const dateTime = postNow ? new Date() : new Date(`${date}T${time}`);
+      const dateTime = postNow ? new Date() : (date && time ? new Date(`${date}T${time}`) : new Date());
       const status = postNow ? "posted" : "scheduled";
 
       if (id) {
@@ -352,34 +430,46 @@ function App() {
     .sort((a, b) => a.dateTime - b.dateTime)
     .filter((p) => matchesFilter(p.status, filter));
 
+  // Show loading screen while checking auth
+  if (checkingAuth) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 
+          'radial-gradient(circle at 20% 30%, rgba(0, 201, 255, 0.15) 0, transparent 50%), ' +
+          'radial-gradient(circle at 80% 70%, rgba(255, 103, 224, 0.12) 0, transparent 50%), ' +
+          'radial-gradient(circle at top left, #101320 0, #05070a 48%)'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: 'var(--text)'
+        }}>
+          <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '32px', marginBottom: '16px' }}></i>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <TikTokLogin 
+        onLoginSuccess={() => {
+          checkTikTokConnection();
+          setIsAuthenticated(true);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="app">
-      {/* DEPLOYMENT TEST BANNER - REMOVE AFTER VERIFYING */}
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 99999,
-        background: 'linear-gradient(90deg, #ff006e, #8338ec, #3a86ff)',
-        color: 'white',
-        padding: '15px 20px',
-        textAlign: 'center',
-        fontSize: '20px',
-        fontWeight: 'bold',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-        animation: 'pulse 2s infinite',
-        borderBottom: '3px solid #00ff00'
-      }}>
-        🚀🚀🚀 NEW DEPLOYMENT DETECTED - Code Updated Successfully! 🚀🚀🚀
-        <br />
-        <span style={{ fontSize: '14px', opacity: 0.9 }}>
-          Deployed: {new Date().toLocaleString()}
-        </span>
-      </div>
-
       {/* HEADER */}
-      <header className="topbar" style={{ marginTop: '50px' }}>
+      <header className="topbar">
         <div className="brand">
           <span className="brand-mark">
             <i className="fa-solid fa-bolt"></i>
@@ -387,7 +477,14 @@ function App() {
           <div>
             <div className="brand-title">Videotto Scheduler</div>
             <div className="brand-subtitle">
-              Multi-platform scheduler • TikTok enabled
+              Multi-platform scheduler • <span style={{ 
+                color: 'var(--accent)', 
+                fontSize: '11px',
+                background: 'rgba(0, 201, 255, 0.1)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontWeight: '600'
+              }}>TEST MODE</span>
             </div>
           </div>
         </div>

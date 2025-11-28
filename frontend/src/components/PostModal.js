@@ -20,6 +20,7 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
   const [time, setTime] = useState("");
   const [account, setAccount] = useState("primary");
   const [postNow, setPostNow] = useState(false);
+  const [saveAsDraft, setSaveAsDraft] = useState(false);
   const [videoFile, setVideoFile] = useState(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [videoPreview, setVideoPreview] = useState(null);
@@ -34,8 +35,9 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
       setCaption(editingPost.caption || "");
       setAccount(editingPost.account || "primary");
       setPostNow(false);
-      setDate(toDateInputValue(editingPost.dateTime));
-      setTime(toTimeInputValue(editingPost.dateTime));
+      setSaveAsDraft(editingPost.status === "draft");
+      setDate(editingPost.dateTime ? toDateInputValue(editingPost.dateTime) : toDateInputValue(baseDate));
+      setTime(editingPost.dateTime ? toTimeInputValue(editingPost.dateTime) : toTimeInputValue(baseDate));
       setVideoUrl(editingPost.media_url || "");
       setVideoFile(null);
       setVideoPreview(editingPost.media_url || null);
@@ -44,6 +46,7 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
       setCaption("");
       setAccount("primary");
       setPostNow(false);
+      setSaveAsDraft(false);
       setDate(toDateInputValue(baseDate));
       setTime(toTimeInputValue(baseDate));
       setVideoUrl("");
@@ -88,14 +91,23 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() || (!postNow && (!date || !time))) {
-      alert("Please fill in title, date and time (unless posting now).");
+    if (!title.trim()) {
+      alert("Please fill in the title.");
       return;
     }
 
-    if (!videoFile && !videoUrl.trim()) {
-      alert("Please provide a video file or video URL");
-      return;
+    // For drafts, date/time/video are optional
+    // For testing, video is optional even for scheduled posts
+    if (!saveAsDraft) {
+      if (!postNow && (!date || !time)) {
+        alert("Please fill in date and time (unless posting now).");
+        return;
+      }
+      // Video is optional for testing purposes
+      // if (!videoFile && !videoUrl.trim()) {
+      //   alert("Please provide a video file or video URL");
+      //   return;
+      // }
     }
 
     // If there's a video file, we need to upload it first
@@ -111,6 +123,7 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
           time,
           account,
           postNow,
+          saveAsDraft,
           videoFile,
           videoUrl: null
         });
@@ -129,6 +142,7 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
       time,
       account,
       postNow,
+      saveAsDraft,
       videoFile: null,
       videoUrl: finalMediaUrl
     });
@@ -179,7 +193,10 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
           </div>
 
           <div className="field-row">
-            <label htmlFor="post-video">Video</label>
+            <label htmlFor="post-video">
+              Video 
+              <span style={{ color: 'var(--text-soft)', fontSize: '11px', fontWeight: 'normal', marginLeft: '4px' }}>(optional - test mode)</span>
+            </label>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <label 
                 htmlFor="post-video-file" 
@@ -279,25 +296,25 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
 
           <div className="field-row inline">
             <div>
-              <label htmlFor="post-date">Date</label>
+              <label htmlFor="post-date">Date {saveAsDraft && <span style={{ color: 'var(--text-soft)', fontSize: '11px', fontWeight: 'normal' }}>(optional)</span>}</label>
               <input
                 id="post-date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 disabled={postNow}
-                required={!postNow}
+                required={!postNow && !saveAsDraft}
               />
             </div>
             <div>
-              <label htmlFor="post-time">Time</label>
+              <label htmlFor="post-time">Time {saveAsDraft && <span style={{ color: 'var(--text-soft)', fontSize: '11px', fontWeight: 'normal' }}>(optional)</span>}</label>
               <input
                 id="post-time"
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 disabled={postNow}
-                required={!postNow}
+                required={!postNow && !saveAsDraft}
               />
             </div>
           </div>
@@ -318,9 +335,32 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
             <label>
               <input
                 type="checkbox"
+                id="save-as-draft"
+                checked={saveAsDraft}
+                onChange={(e) => {
+                  setSaveAsDraft(e.target.checked);
+                  if (e.target.checked) {
+                    setPostNow(false);
+                  }
+                }}
+              />
+              Save as draft (date, time, and video optional)
+            </label>
+          </div>
+
+          <div className="field-row checkbox-row">
+            <label>
+              <input
+                type="checkbox"
                 id="post-now"
                 checked={postNow}
-                onChange={(e) => setPostNow(e.target.checked)}
+                onChange={(e) => {
+                  setPostNow(e.target.checked);
+                  if (e.target.checked) {
+                    setSaveAsDraft(false);
+                  }
+                }}
+                disabled={saveAsDraft}
               />
               Post immediately (ignore schedule)
             </label>
@@ -338,9 +378,15 @@ function PostModal({ isOpen, onClose, onSave, editingPost, defaultDate }) {
             >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              Save post
-            </button>
+            {saveAsDraft ? (
+              <button type="submit" className="btn btn-primary" style={{ background: 'var(--text-soft)' }}>
+                Save as Draft
+              </button>
+            ) : (
+              <button type="submit" className="btn btn-primary">
+                Save post
+              </button>
+            )}
           </div>
         </form>
       </div>
