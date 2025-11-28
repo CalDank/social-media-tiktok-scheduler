@@ -250,6 +250,15 @@ body {
   min-height: 0;
 }
 
+/* Calendar panel - no scrolling */
+.panel.calendar-panel {
+  overflow: hidden;
+}
+
+.panel.calendar-panel .calendar {
+  overflow: hidden;
+}
+
 .panel:hover {
   transform: translateY(-1px);
   box-shadow: 
@@ -363,7 +372,8 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .month-switcher {
@@ -418,12 +428,13 @@ select {
 }
 
 .calendar-grid.header-row > div {
-  padding: 6px 6px 8px;
+  padding: 4px 4px 6px;
   text-align: center;
+  font-size: 10px;
 }
 
 .calendar-grid.body-rows {
-  gap: 4px;
+  gap: 3px;
   overflow: hidden;
   flex: 1;
   min-height: 0;
@@ -432,9 +443,9 @@ select {
 /* Day cells */
 
 .calendar-day {
-  min-height: 120px;
-  border-radius: 14px;
-  padding: 8px 10px;
+  min-height: 70px;
+  border-radius: 10px;
+  padding: 6px 8px;
   position: relative;
   background: 
     linear-gradient(135deg, rgba(25, 31, 42, 0.6) 0%, rgba(13, 16, 22, 0.8) 100%);
@@ -463,10 +474,11 @@ select {
 }
 
 .day-number {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-soft);
   transition: color 0.2s ease;
+  margin-bottom: 2px;
 }
 
 .day-number.today {
@@ -496,18 +508,18 @@ select {
 }
 
 .day-post-preview {
-  padding: 5px 8px 5px 6px;
-  border-radius: 8px;
-  font-size: 10px;
+  padding: 3px 6px 3px 4px;
+  border-radius: 6px;
+  font-size: 9px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-alt) 100%);
   color: #020617;
   max-width: 100%;
   box-shadow: 
-    0 2px 8px rgba(0, 201, 255, 0.4),
-    0 1px 4px rgba(0, 0, 0, 0.3);
+    0 2px 6px rgba(0, 201, 255, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.3);
   font-weight: 600;
   animation: slideIn 0.3s ease-out;
   transition: all 0.2s ease;
@@ -531,40 +543,26 @@ select {
 }
 
 .day-post-preview i {
-  font-size: 11px;
+  font-size: 8px;
 }
 
 .day-post-preview-time {
   font-weight: 600;
+  font-size: 8px;
 }
 
 .day-post-preview-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 8px;
 }
 
 .day-posts-container {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 6px;
-}
-
-.day-post-preview {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.day-post-preview:hover {
-  transform: translateX(2px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  margin-top: 4px;
 }
 
 /* --------- SIDE PANEL --------- */
