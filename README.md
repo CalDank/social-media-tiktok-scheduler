@@ -4,45 +4,45 @@ A full-stack web application for scheduling and managing TikTok content posts. P
 
 ## Features
 
-- 📅 **Calendar View**: Visual calendar interface to schedule and manage posts
-- 🔐 **User Authentication**: Secure JWT-based authentication system
-- 🎬 **TikTok Integration**: Connect your TikTok account and publish directly
-- 📤 **File Upload**: Upload videos and images with AWS S3 storage
-- ⏰ **Automated Scheduling**: Background scheduler service that publishes posts at scheduled times
-- 🎨 **Modern UI**: Clean, responsive design with dark theme support
-- 🔄 **Multi-Platform Ready**: Architecture designed to support Instagram, YouTube Shorts, and more in the future
+- 📅 **Interactive Calendar View** - Visual calendar interface to schedule and manage posts
+- 🔐 **User Authentication** - Secure JWT-based authentication system
+- 🎬 **TikTok Integration** - Connect your TikTok account and publish directly via TikTok API
+- 📤 **Media Upload** - Upload videos and images with AWS S3 cloud storage
+- ⏰ **Automated Scheduling** - Background cron scheduler that publishes posts at scheduled times
+- 🎨 **Modern UI** - Clean, responsive design with dark theme support
+- 🔄 **Multi-Platform Ready** - Architecture designed to support Instagram, YouTube Shorts, and more (coming soon)
 
 ## Tech Stack
 
 ### Frontend
-- React 19
-- React Scripts
-- Font Awesome Icons
+- **React 19** - Modern React with latest features
+- **React Scripts** - Build tooling and development server
+- **Font Awesome** - Icon library
 
 ### Backend
-- Node.js with Express
-- SQLite Database
-- JWT Authentication
-- AWS S3 for file storage
-- TikTok API Integration
-- Node-cron for scheduled tasks
+- **Node.js** with **Express** - RESTful API server
+- **SQLite** - Lightweight database for post storage
+- **JWT** - Token-based authentication
+- **AWS S3** - Cloud storage for media files
+- **TikTok API** - Official TikTok integration
+- **Node-cron** - Scheduled task execution
 
 ## Project Structure
 
 ```
 social-media-tiktok-scheduler/
 ├── backend/
-│   ├── database/          # Database configuration and initialization
+│   ├── database/          # Database configuration and SQLite setup
 │   ├── middleware/        # Authentication middleware
-│   ├── models/            # Data models
+│   ├── models/            # Data models (Post)
 │   ├── routes/            # API routes (auth, posts, upload)
 │   ├── scripts/           # Database initialization scripts
 │   ├── services/          # Business logic (TikTok, S3, scheduler)
 │   └── server.js          # Express server entry point
 ├── frontend/
-│   ├── public/            # Static files
+│   ├── public/            # Static files and legal pages
 │   └── src/
-│       ├── components/    # React components
+│       ├── components/    # React components (Calendar, PostModal, etc.)
 │       └── services/      # API service layer
 └── README.md
 ```
@@ -53,7 +53,7 @@ social-media-tiktok-scheduler/
 
 - Node.js (v14 or higher)
 - npm or yarn
-- TikTok Developer Account (for TikTok integration)
+- TikTok Developer Account (for TikTok API access)
 - AWS Account (for S3 storage)
 
 ### Installation
@@ -124,6 +124,15 @@ social-media-tiktok-scheduler/
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:5000
 
+## Usage
+
+1. **Register/Login** - Create an account or login with existing credentials
+2. **Connect TikTok** - Link your TikTok account through the connection interface
+3. **Create Posts** - Click on any date in the calendar to create a new scheduled post
+4. **Upload Media** - Upload videos or images for your posts
+5. **Schedule** - Set the date and time for your post to be published
+6. **Auto-Publish** - The scheduler service automatically publishes posts at their scheduled times
+
 ## API Endpoints
 
 ### Authentication
@@ -132,25 +141,16 @@ social-media-tiktok-scheduler/
 - `GET /api/auth/me` - Get current user info
 
 ### Posts
-- `GET /api/posts` - Get all posts
+- `GET /api/posts` - Get all posts for authenticated user
 - `POST /api/posts` - Create a new post
 - `PUT /api/posts/:id` - Update a post
 - `DELETE /api/posts/:id` - Delete a post
 
 ### Upload
-- `POST /api/upload` - Upload file to S3
+- `POST /api/upload` - Upload file to S3 and get presigned URL
 
 ### Health Check
 - `GET /api/health` - Check API status
-
-## Usage
-
-1. **Register/Login**: Create an account or login with existing credentials
-2. **Connect TikTok**: Link your TikTok account through the connection interface
-3. **Create Posts**: Click on any date in the calendar to create a new scheduled post
-4. **Upload Media**: Upload videos or images for your posts
-5. **Schedule**: Set the date and time for your post to be published
-6. **Auto-Publish**: The scheduler service will automatically publish posts at their scheduled times
 
 ## Development
 
@@ -163,6 +163,10 @@ social-media-tiktok-scheduler/
 - `npm start` - Start development server
 - `npm run build` - Build for production
 - `npm test` - Run tests
+
+## Scheduler Service
+
+The application includes a background scheduler service that runs every minute to check for posts that are due to be published. Posts with a `scheduled` status and a `scheduled_datetime` in the past are automatically posted to TikTok.
 
 ## License
 
